@@ -1,13 +1,11 @@
 import React from 'react';
-import {FiArrowRight} from 'react-icons/fi';
+import {FiMapPin} from 'react-icons/fi';
 import {Link} from 'react-router-dom';
 
 import logoImg from '../images/gps.png';
 import '../styles/pages/landing.css';
 
-
-
-function Landing() {
+const Landing = () => {
 return(
     
 <div id="page-landing">
@@ -16,8 +14,8 @@ return(
   <img src={logoImg} alt=".DPerdas"/>
 
   <main>
-    <h1>Ajude a combater perdas de água parei 16min</h1>
-    <p>Envie a localização do vazamento!</p>
+    <h1>Plataforma de combate às perdas de água</h1>
+    <p>Local do vazamento!</p>
   </main>
 
   <div className="location">
@@ -25,8 +23,11 @@ return(
     <span>Goiás</span>
   </div>
 
-  <Link to="/point" className="enter-app">
-    <FiArrowRight size={26} color="rgba(0, 0, 0, 0.6)" />
+  <Link to="/points/create" className="enter-app">
+    <span>
+    <FiMapPin size={26} color="rgba(0, 0, 0, 0.6)" />
+    </span>
+    <strong>Enviar</strong>
   </Link>
 
 </div>

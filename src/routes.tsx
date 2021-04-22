@@ -13,9 +13,9 @@ return (
 <BrowserRouter>
 <Switch>
 <Route path="/" exact component={Landing} />
-<Route path="/points" component={PointsMap} />
 
 <Route path="/points/create" component={CreatePoint} />
+<Route path="/points" component={PointsMap} />
 <Route path="/points/:id" component={Point} />
 
 </Switch>
