@@ -1,9 +1,13 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, ChangeEvent, MapHTMLAttributes, Attributes, FormEvent } from 'react';
 import { FiArrowLeft, FiHome, FiArrowRight } from 'react-icons/fi';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, MapContainerProps, MapConsumerProps, useMapEvents } from 'react-leaflet';
 import { Link } from 'react-router-dom';
-import Leaflet from 'leaflet';
+
+import axios from 'axios';
+
+import L, { LeafletMouseEvent } from "leaflet";
+
 
 import mapMarkerImg from '../icons/ferramenta.svg';
 import logoImg from '../icons/water.svg';
@@ -17,29 +21,161 @@ interface Type {
     id: number;
     title: string;
     image: string;
-   
   }
 
+interface IBGEUFResponse {
+  sigla: string;
+}
 
-    const mapIcon = Leaflet.icon({
+interface IBGECityResponse {
+  nome: string;
+}
+ 
+const mapIcon = L.icon({
     iconUrl: mapMarkerImg,
 
     iconSize: [58, 68],
     iconAnchor: [29, 68],
-    popupAnchor: [170, 2]
-
+    popupAnchor: [170, 2],
+    
 })
 
 
 const CreatePoint = () => {
 
+  //Estados
     const [types, setTypes] = useState<Type[]>([]);
+    const [ufs, setUfs] = useState<string[]>([]);
+    const [cities, setCities] = useState<string[]>([]);
+    
+    const [initialPosition, setInitialPosition] = useState<[number, number]>([0, 0]);
+
+    const [formData, setFormData] = useState({
+      date: '',
+      meter: '',
+      whatsapp: '',
+
+    })
+
+    const [selectedUf, setSelectedUf] = useState('GO');
+    const [selectedCity, setSelectedCity] = useState('Monte Alegre de Goiás');
+    const [selectedItems, setSelectedItems] = useState<number[]>([]);
+
+    const [selectedPosition, setSelectedPosition] = useState<[number, number]>([0, 0]);
+
+//Atenção: Não consegui encontrar solução para colocar evento onclick no mapcontainer
+
+    //Efeitos
+    useEffect(()=> {
+      navigator.geolocation.getCurrentPosition(position => {
+        console.log(position)
+        const { latitude, longitude} = position.coords;
+        setInitialPosition([latitude, longitude]);
+      });
+    }, []);
 
     useEffect(()=> {
         api.get('types').then(response => {
             setTypes(response.data);
         }); 
     }, []);
+
+    useEffect(()=> {
+      axios.get<IBGEUFResponse[]>('https://servicodados.ibge.gov.br/api/v1/localidades/estados').then(response => {
+          const ufInitials = response.data.map(uf => uf.sigla);
+          setUfs(ufInitials);
+      }); 
+  }, []);
+
+  useEffect(()=> {
+    //seleciona as cidades sempre que a a uf mudar
+    if(selectedUf === '0') {
+      return;
+    }
+    axios.get<IBGECityResponse[]>(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedUf}/municipios`).then(response => {
+      const cityNames = response.data.map(city => city.nome);
+      setCities(cityNames);
+  }); 
+
+  }, [selectedUf]);
+
+  function handleSelectUf(event: ChangeEvent<HTMLSelectElement>) {
+    const uf = event.target.value;
+    setSelectedUf(uf);
+  }
+
+  function handleSelectCity(event: ChangeEvent<HTMLSelectElement>) {
+    const city = event.target.value;
+    setSelectedCity(city);
+  }
+
+  function handleMapClick(event: LeafletMouseEvent) {
+    const { lat: latidude, lng: longitude } = event.latlng;
+    setSelectedPosition([latidude, longitude]);
+  }
+  
+
+  function MyLocation() {    
+    const map = useMapEvents({
+      click: () => {
+        map.locate()
+      },
+      locationfound: (location) => {
+        const { lat: latidude, lng: longitude } = location.latlng;
+        setSelectedPosition([latidude, longitude]);
+    //    L.marker([latidude, longitude], { icon }).addTo(map.target);
+        console.log('location found:', location)
+      },
+    })
+    return null
+  }
+
+// 
+function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
+const { name, value} = event.target;
+setFormData({ ...formData, [name]: value})
+}
+
+function handleSelectItem (id: number) {
+  console.log('clicado', id)
+  //setSelectedItems([id]); //seleciona apenas 1 item
+
+  const alreadySelected = selectedItems.findIndex(item => item ===id); //pega items selecionados
+  
+  if(alreadySelected >= 0) { //se já existir item selecionado, vê se os id são diferentes
+    const filteredItems = selectedItems.filter(item => item !== id);
+    setSelectedItems(filteredItems); 
+  }
+  else {
+    setSelectedItems([...selectedItems, id ]) //seleciona mais de 1 tipo de vazamento
+  }    
+  }
+  
+  async function handleSubmit(event: FormEvent) { //salva os dados na API
+    event.preventDefault();
+
+    const { date, meter, whatsapp } = formData;
+    const uf = selectedUf;
+    const city = selectedCity;
+    const [latitude, longitude] = selectedPosition;
+    const items = selectedItems;
+
+    const data = {
+      date, 
+      meter,
+      whatsapp,
+      uf,
+      city,
+      latitude,
+      longitude,
+      items
+    }
+    console.log(data);
+    await api.post('points', data);
+    alert("Ponto de perda cadastrado!")
+  }
+
+
 
   return (
       <div id="page-create-point">
@@ -54,7 +190,7 @@ const CreatePoint = () => {
               </Link>
           </header>
 
-          <form>
+          <form onSubmit={handleSubmit}>
               <h1>Cadastro de ocorrência</h1>
           
 
@@ -69,6 +205,7 @@ const CreatePoint = () => {
                 type="date"
                 name="date"
                 id="date"
+                onChange={handleInputChange}
                 />
                 </div>
 
@@ -80,6 +217,7 @@ const CreatePoint = () => {
                 type="text"
                 name="meter"
                 id="meter"
+                onChange={handleInputChange}
                 />
                 </div>
 
@@ -90,6 +228,7 @@ const CreatePoint = () => {
                 type="text"
                 name="whatsapp"
                 id="whatsapp"
+                onChange={handleInputChange}
                 />
                 </div>
                 </div>
@@ -102,41 +241,63 @@ const CreatePoint = () => {
                     <span>Selecione o endereço no mapa</span>
                 </legend>
 
-                <MapContainer center={[-13.0354203,-46.7773097]} zoom={15}>
+                <MapContainer 
+                center={ [-13.2549304, -46.8944970]} 
+                zoom={14.8} 
+
+                >
+                  
                     <TileLayer                                
                     attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
 
-<Marker 
+            <Marker 
             icon={mapIcon}
-            position= {[-13.0345378,-46.7753647]}
+            position= {[-13.2548342, -46.8945686]} //{selectedPosition} pega a posição do click
             >
 
             <Popup closeButton={false} minWidth={240} maxWidth={240} className="map-popup">
-            Vazamento no cavalete
+            Localização Atual
             <Link to="/points/1">
                 <FiArrowRight size={20} color="#fff"/>
                 </Link>    
 
             </Popup>
 
-            </ Marker>
+            </Marker>
 
+        <MyLocation />
+            
                 </MapContainer>
 
                 <div className="field-group">
                     <div className="field">
                         <label htmlFor="uf">Estado (UF)</label>
-                        <select name="uf" id="uf">
+                        <select 
+                        name="uf" 
+                        id="uf" 
+                        value={selectedUf} onChange={handleSelectUf}>
+
                         <option value="0">Selecione a UF</option>
+                        {ufs.map(uf => (
+                          <option key={uf} value={uf}>{uf}</option>
+                        ))}
                         </select>                        
                     </div>
 
                     <div className="field">
                         <label htmlFor="city">Cidade</label>
-                        <select name="city" id="city">
+                        <select 
+                        name="city" 
+                        id="city"
+                          value={selectedCity} onChange={handleSelectCity}>
+
                         <option value="0">Selecione a cidade</option>
+                        {cities.map(city => (
+                          <option key={city} value={city}>{city}</option>
+                        ))}
+
                         </select>                        
                     </div>
 
@@ -152,7 +313,12 @@ const CreatePoint = () => {
             <ul className="items-grid">
                 
                 {types.map(type => (
-                    <li key= {type.id}>
+                    <li 
+                    key= {type.id} 
+                    onClick= {()=> handleSelectItem(type.id)} 
+                    className={selectedItems.includes(type.id) ? 'selected': ''}
+                    >
+
                 <img src={`http://localhost:3333/uploads/${type.image}`} alt={type.title}/>
                 <span>{type.title}</span>
                 </li>
@@ -174,8 +340,8 @@ const CreatePoint = () => {
       </div>
       
   )
-}
- 
+                }
+
 export default CreatePoint;
 
 

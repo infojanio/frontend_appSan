@@ -21,6 +21,7 @@ const mapIcon = Leaflet.icon({
 })
 
 const PointsMap = ()=> {
+    
     return(
         <div id="page-map">
             <aside>
@@ -44,6 +45,7 @@ const PointsMap = ()=> {
         >
             <TileLayer url="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
+
             <Marker 
             icon={mapIcon}
             position= {[-13.0345378,-46.7753647]}
@@ -56,8 +58,10 @@ const PointsMap = ()=> {
                 </Link>    
 
             </Popup>
-
+        
             </ Marker>
+
+           
 
             </MapContainer>
 
